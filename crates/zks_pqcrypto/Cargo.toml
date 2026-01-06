@@ -14,7 +14,7 @@ categories = ["cryptography", "no-std"]
 
 [dependencies]
 # Core types and errors
-zks_types = { path = "../zks_types" }
+zks_types = { version = "0.1.0", path = "../zks_types" }
 
 # Post-quantum cryptography - Pure Rust (WASM-compatible)
 ml-kem = "0.2"      # ML-KEM (Kyber) key encapsulation - uses rand_core 0.6

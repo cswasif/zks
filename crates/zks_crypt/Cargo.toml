@@ -13,7 +13,7 @@ keywords = ["zero-knowledge", "post-quantum", "cryptography", "encryption", "cha
 categories = ["cryptography", "no-std"]
 
 [dependencies]
-zks_types = { path = "../zks_types" }
+zks_types = { version = "0.1.0", path = "../zks_types" }
 chacha20poly1305 = "0.10"
 chacha20 = "0.9"
 sha2 = "0.10"

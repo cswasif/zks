@@ -9,7 +9,7 @@ repository = "https://github.com/zks-protocol/zks"
 homepage = "https://zks-protocol.org"
 documentation = "https://docs.rs/zks_wire"
 readme = "README.md"
-keywords = ["network", "nat", "stun", "p2p", "wire", "swarm"]
+keywords = ["network", "nat", "stun", "p2p", "swarm"]
 categories = ["network-programming", "cryptography"]
 
 [dependencies]
@@ -43,7 +43,7 @@ url = "2.4"
 hex = "0.4"
 
 # Cryptography
-zks_crypt = { path = "../zks_crypt" }
+zks_crypt = { version = "0.1.0", path = "../zks_crypt" }
 zeroize = "1.6"
 
 [dev-dependencies]

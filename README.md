@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/zks-protocol/zks/actions"><img src="https://img.shields.io/github/actions/workflow/status/zks-protocol/zks/ci.yml?branch=main&style=flat-square&logo=github" alt="Build Status"></a>
-  <a href="https://crates.io/crates/zks_sdk"><img src="https://img.shields.io/crates/v/zks_sdk.svg?style=flat-square&logo=rust" alt="Crates.io"></a>
-  <a href="https://docs.rs/zks_sdk"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square&logo=rust" alt="Docs"></a>
+  <a href="https://crates.io/crates/zks"><img src="https://img.shields.io/crates/v/zks.svg?style=flat-square&logo=rust" alt="Crates.io"></a>
+  <a href="https://docs.rs/zks"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square&logo=rust" alt="Docs"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.70+-orange.svg?style=flat-square&logo=rust" alt="Rust"></a>
 </p>

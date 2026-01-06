@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # WASM-compatible post-quantum crypto
-zks_pqcrypto = { path = "../zks_pqcrypto" }
+zks_pqcrypto = { version = "0.1.0", path = "../zks_pqcrypto" }
 
 # WASM bindings
 wasm-bindgen = "0.2"

@@ -35,8 +35,8 @@ hkdf = "0.12"
 hmac = "0.12"
 
 # ZK Protocol crates
-zks_pqcrypto = { path = "../zks_pqcrypto" }
-zks_wire = { path = "../zks_wire" }
+zks_pqcrypto = { version = "0.1.0", path = "../zks_pqcrypto" }
+zks_wire = { version = "0.1.0", path = "../zks_wire" }
 
 [dev-dependencies]
 tokio-test = "0.4"
