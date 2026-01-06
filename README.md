@@ -399,16 +399,24 @@ See [LICENSE](LICENSE) for the full license text.
 
 ---
 
-## 🤝 Sponsors
+<h2 align="center">🤝 Sponsors</h2>
+
+<table align="center">
+  <tr>
+    <td align="center" width="300">
+      <a href="https://www.cloudflare.com/lp/project-alexandria/">
+        <img src="https://www.cloudflare.com/img/logo-web-badges/cf-logo-on-white-bg.svg" alt="Cloudflare" width="180">
+      </a>
+      <br><br>
+      <b>Cloudflare</b>
+      <br>
+      <sub>Project Alexandria</sub>
+    </td>
+  </tr>
+</table>
 
 <p align="center">
-  <a href="https://www.cloudflare.com/lp/project-alexandria/">
-    <img src="https://www.cloudflare.com/img/logo-web-badges/cf-logo-on-white-bg.svg" alt="Cloudflare" width="200">
-  </a>
-</p>
-
-<p align="center">
-  <strong>Sponsored by Cloudflare through <a href="https://www.cloudflare.com/lp/project-alexandria/">Project Alexandria</a></strong>
+  <sub>🚀 Infrastructure powered by <a href="https://www.cloudflare.com/lp/project-alexandria/"><b>Cloudflare Project Alexandria</b></a> — Supporting open-source innovation</sub>
 </p>
 
 ---
