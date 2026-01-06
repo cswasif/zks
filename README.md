@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/logo.png" alt="ZKS Protocol" width="400">
+  <!-- <img src="resources/logo.png" alt="ZKS Protocol" width="400"> -->
 </p>
 
 <h1 align="center">🔐 ZKS Protocol</h1>
