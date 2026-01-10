@@ -1,122 +1,26 @@
-//! Secure messenger for encrypted text communication
+//! # ZKS Secure Messenger
+//! 
+//! High-level messaging abstraction over ZKS connections.
 
+use crate::error::SdkError;
 use tokio::sync::mpsc;
-use tracing::{info, debug, warn};
+use tracing::{debug, info};
 
-use crate::{
-    connection::{ZkConnection, ZksConnection},
-    error::{Result, SdkError},
-};
-
-/// A secure messenger for encrypted text communication
+/// High-level secure messenger for sending/receiving text messages
+/// This is a simple wrapper that provides a channel-based interface
+#[derive(Debug)]
 pub struct SecureMessenger {
     incoming_rx: mpsc::Receiver<String>,
     outgoing_tx: mpsc::Sender<String>,
 }
 
-/// Message types for the secure messenger
-#[derive(Debug, Clone)]
-pub enum Message {
-    /// Regular text message
-    Text(String),
-    
-    /// System notification
-    System(String),
-    
-    /// File transfer notification
-    FileTransfer { name: String, size: u64 },
-}
-
 impl SecureMessenger {
-    /// Create a new secure messenger from a ZK connection
-    pub fn from_zk(mut connection: ZkConnection) -> Self {
-        let (incoming_tx, incoming_rx) = mpsc::channel::<String>(100);
-        let (outgoing_tx, outgoing_rx) = mpsc::channel::<String>(100);
-        
-        // Spawn task to handle both incoming and outgoing messages
-        tokio::spawn(async move {
-            let mut outgoing_rx = outgoing_rx;
-            loop {
-                tokio::select! {
-                    // Handle incoming messages
-                    result = connection.recv_message() => {
-                        match result {
-                            Ok(data) => {
-                                match String::from_utf8(data) {
-                                    Ok(text) => {
-                                        if let Err(_) = incoming_tx.send(text).await {
-                                            break;
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!("Received invalid UTF-8 message: {}", e);
-                                        // Optionally, you could send a notification about invalid messages
-                                        // or implement a different encoding scheme
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to receive message: {}", e);
-                                break;
-                            }
-                        }
-                    }
-                    // Handle outgoing messages
-                    Some(message) = outgoing_rx.recv() => {
-                        if let Err(e) = connection.send_message(message.as_bytes()).await {
-                            warn!("Failed to send message: {}", e);
-                            break;
-                        }
-                    }
-                    else => break,
-                }
-            }
-        });
-        
-        Self {
-            incoming_rx,
-            outgoing_tx,
-        }
-    }
-    
-    /// Create a new secure messenger from a ZKS connection
-    pub fn from_zks(mut connection: ZksConnection) -> Self {
-        let (incoming_tx, incoming_rx) = mpsc::channel::<String>(100);
-        let (outgoing_tx, outgoing_rx) = mpsc::channel::<String>(100);
-        
-        // Spawn task to handle both incoming and outgoing messages
-        tokio::spawn(async move {
-            let mut outgoing_rx = outgoing_rx;
-            loop {
-                tokio::select! {
-                    // Handle incoming messages
-                    result = connection.recv_message() => {
-                        match result {
-                            Ok(data) => {
-                                if let Ok(text) = String::from_utf8(data) {
-                                    if let Err(_) = incoming_tx.send(text).await {
-                                        break;
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to receive message: {}", e);
-                                break;
-                            }
-                        }
-                    }
-                    // Handle outgoing messages
-                    Some(message) = outgoing_rx.recv() => {
-                        if let Err(e) = connection.send_message(message.as_bytes()).await {
-                            warn!("Failed to send message: {}", e);
-                            break;
-                        }
-                    }
-                    else => break,
-                }
-            }
-        });
-        
+    /// Create a new secure messenger from channel endpoints
+    /// This approach allows the connection to remain on the same thread/task
+    pub fn new(
+        incoming_rx: mpsc::Receiver<String>,
+        outgoing_tx: mpsc::Sender<String>,
+    ) -> Self {
         Self {
             incoming_rx,
             outgoing_tx,
@@ -124,47 +28,53 @@ impl SecureMessenger {
     }
     
     /// Send a text message
-    pub async fn send_text(&self, message: &str) -> Result<()> {
-        self.outgoing_tx.send(message.to_string()).await
-            .map_err(|_| SdkError::ConnectionFailed("Messenger closed".to_string()))?;
-        
-        debug!("Sent text message: {}", message);
+    pub async fn send(&self, message: String) -> Result<(), SdkError> {
+        debug!("Sending message: {}", message);
+        self.outgoing_tx.send(message).await
+            .map_err(|_| SdkError::ConnectionFailed("Failed to send message".to_string()))?;
         Ok(())
     }
     
     /// Receive a text message (blocking)
-    pub async fn recv_text(&mut self) -> Result<String> {
+    pub async fn recv(&mut self) -> Result<String, SdkError> {
+        debug!("Waiting for message");
         self.incoming_rx.recv().await
-            .ok_or_else(|| SdkError::ConnectionFailed("Messenger closed".to_string()))
+            .ok_or_else(|| SdkError::ConnectionFailed("Connection closed".to_string()))
     }
     
     /// Try to receive a text message (non-blocking)
-    pub fn try_recv_text(&mut self) -> Result<Option<String>> {
-        match self.incoming_rx.try_recv() {
-            Ok(message) => Ok(Some(message)),
-            Err(mpsc::error::TryRecvError::Empty) => Ok(None),
-            Err(mpsc::error::TryRecvError::Disconnected) => {
-                Err(SdkError::ConnectionFailed("Messenger closed".to_string()))
-            }
-        }
-    }
-    
-    /// Send a system message
-    pub async fn send_system(&self, message: &str) -> Result<()> {
-        let system_msg = format!("SYSTEM: {}", message);
-        self.send_text(&system_msg).await
-    }
-    
-    /// Get the number of pending incoming messages
-    pub fn pending_messages(&self) -> usize {
-        self.incoming_rx.len()
+    pub fn try_recv(&mut self) -> Result<String, SdkError> {
+        self.incoming_rx.try_recv()
+            .map_err(|e| match e {
+                mpsc::error::TryRecvError::Empty => SdkError::Timeout,
+                mpsc::error::TryRecvError::Disconnected => SdkError::ConnectionFailed("Connection closed".to_string()),
+            })
     }
     
     /// Close the messenger
-    pub async fn close(self) -> Result<()> {
-        info!("Closing secure messenger");
-        // The spawned tasks will exit when the channels are dropped
-        Ok(())
+    pub fn close(&self) {
+        info!("Closing messenger");
     }
 }
 
+/// Helper function to create a messenger from a ZKS connection
+/// This function should be called from within the same task that owns the connection
+/// and will return the messenger along with the channels needed for message processing
+pub fn create_messenger_from_zks() -> (
+    SecureMessenger,
+    mpsc::Sender<String>,    // incoming_tx
+    mpsc::Receiver<String>,  // outgoing_rx
+) {
+    let (incoming_tx, incoming_rx) = mpsc::channel::<String>(100);
+    let (outgoing_tx, outgoing_rx) = mpsc::channel::<String>(100);
+    
+    let messenger = SecureMessenger::new(incoming_rx, outgoing_tx);
+    
+    (messenger, incoming_tx, outgoing_rx)
+}
+
+impl Drop for SecureMessenger {
+    fn drop(&mut self) {
+        debug!("SecureMessenger dropped");
+    }
+}

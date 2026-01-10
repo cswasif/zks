@@ -1,0 +1,6 @@
+namespace test {
+    interface TestInterface {
+        constructor()
+        string get_name()
+    }
+};

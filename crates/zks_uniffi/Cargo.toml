@@ -1,0 +1,24 @@
+[package]
+name = "zks_uniffi"
+version = "0.1.0"
+edition = "2021"
+description = "UniFFI bindings for ZKS SDK (Android/iOS)"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+name = "zks_uniffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+
+[dependencies]
+uniffi = { version = "0.25", features = ["cli"] }
+zks = { path = "../zks_sdk" }
+zks_wire = { path = "../zks_wire" }
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
+thiserror = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+
+[build-dependencies]
+uniffi = { version = "0.25", features = ["build"] }

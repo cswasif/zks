@@ -1,7 +1,15 @@
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{WebSocket, MessageEvent, CloseEvent, ErrorEvent};
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+
+// Helper macro for console logging
+macro_rules! console_log {
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
+}
+
+
 
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -12,34 +20,34 @@ pub enum TransportState {
     Error,
 }
 
-#[wasm_bindgen]
+#[derive(Clone)]
 pub struct TransportConfig {
     pub url: String,
     pub max_reconnect_attempts: u32,
     pub reconnect_delay_ms: u32,
 }
 
-#[wasm_bindgen]
 impl TransportConfig {
-    #[wasm_bindgen(constructor)]
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+    
+    pub fn max_reconnect_attempts(&self) -> u32 {
+        self.max_reconnect_attempts
+    }
+    
+    pub fn reconnect_delay_ms(&self) -> u32 {
+        self.reconnect_delay_ms
+    }
+}
+
+impl TransportConfig {
     pub fn new(url: String) -> Self {
         Self {
             url,
             max_reconnect_attempts: 3,
             reconnect_delay_ms: 1000,
         }
-    }
-
-    #[wasm_bindgen]
-    pub fn with_reconnect_attempts(mut self, attempts: u32) -> Self {
-        self.max_reconnect_attempts = attempts;
-        self
-    }
-
-    #[wasm_bindgen]
-    pub fn with_reconnect_delay(mut self, delay_ms: u32) -> Self {
-        self.reconnect_delay_ms = delay_ms;
-        self
     }
 }
 
@@ -55,12 +63,16 @@ pub struct WebSocketTransport {
 #[wasm_bindgen]
 impl WebSocketTransport {
     #[wasm_bindgen(constructor)]
-    pub fn new(config: TransportConfig) -> Self {
+    pub fn new(url: String, max_reconnect_attempts: u32) -> Self {
         Self {
             websocket: None,
             message_queue: Arc::new(Mutex::new(VecDeque::new())),
             state: Arc::new(Mutex::new(TransportState::Disconnected)),
-            config,
+            config: TransportConfig {
+                url,
+                max_reconnect_attempts,
+                reconnect_delay_ms: 1000,
+            },
             reconnect_attempts: Arc::new(Mutex::new(0)),
         }
     }
@@ -126,7 +138,7 @@ impl WebSocketTransport {
     }
 
     fn setup_event_handlers(&self, websocket: &WebSocket) -> Result<(), JsValue> {
-        let websocket_clone = websocket.clone();
+        let _websocket_clone = websocket.clone();
         let state = Arc::clone(&self.state);
         let message_queue = Arc::clone(&self.message_queue);
         let reconnect_attempts = Arc::clone(&self.reconnect_attempts);
@@ -166,18 +178,19 @@ impl WebSocketTransport {
 
         // On close
         let state = Arc::clone(&self.state);
+        let reconnect_attempts_clone = Arc::clone(&self.reconnect_attempts);
         let onclose = Closure::wrap(Box::new(move |event: CloseEvent| {
             console_log!("WebSocket closed: code={}, reason={}", event.code(), event.reason());
             *state.lock().unwrap() = TransportState::Disconnected;
             
             // Attempt reconnection if configured
-            let attempts = *reconnect_attempts.lock().unwrap();
+            let attempts = *reconnect_attempts_clone.lock().unwrap();
             if attempts < config.max_reconnect_attempts {
-                *reconnect_attempts.lock().unwrap() += 1;
+                *reconnect_attempts_clone.lock().unwrap() += 1;
                 console_log!("Attempting reconnection {} of {}", attempts + 1, config.max_reconnect_attempts);
                 
                 // Schedule reconnection attempt
-                let state = Arc::clone(&state);
+                let _state = Arc::clone(&state);
                 let delay = config.reconnect_delay_ms;
                 spawn_local(async move {
                     let _ = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(&mut |resolve, _| {
@@ -206,13 +219,3 @@ pub fn convert_zk_url(url: &str) -> String {
        .replace("zks://", "wss://")
 }
 
-// Helper macro for console logging
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-macro_rules! console_log {
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}

@@ -1,0 +1,8 @@
+namespace zks_uniffi {
+    interface ZksMeetClient {
+        constructor(string peer_id);
+        [Name=new_random]
+        constructor();
+        string get_peer_id();
+    }
+};

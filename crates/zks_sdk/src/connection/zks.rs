@@ -1,8 +1,8 @@
-//! Swarm-based ZKS connection implementation
+//! Swarm-based ZKS connection implementation with real onion routing
 
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use tracing::{info, debug, warn};
-use zks_wire::{Swarm, SwarmCircuit};
+use zks_wire::{SwarmController, SwarmCircuit};
 
 use crate::{
     config::ConnectionConfig,
@@ -15,57 +15,74 @@ pub trait ZksStream: AsyncRead + AsyncWrite + Send + Unpin + 'static {}
 
 impl<T: AsyncRead + AsyncWrite + Send + Unpin + 'static> ZksStream for T {}
 
-/// Swarm-based ZKS connection for maximum privacy
+/// Swarm-based ZKS connection for maximum privacy with real onion routing
 pub struct ZksConnection {
     stream: EncryptedStream<Box<dyn ZksStream>>,
     config: ConnectionConfig,
     peer_addr: String,
     hop_count: u8,
     circuit: Option<SwarmCircuit>,
-    swarm: Option<Swarm>,
+    swarm_controller: Option<SwarmController>,
+    circuit_id: Option<String>,
 }
 
 impl ZksConnection {
-    /// Connect to a peer using zks:// protocol with onion routing
+    /// Connect to a peer using zks:// protocol with real onion routing
     pub async fn connect(
         url: String, 
         config: ConnectionConfig, 
         min_hops: u8, 
         max_hops: u8
     ) -> Result<Self> {
+        info!("🔐 Connecting to ZKS peer via onion routing: {} with {}-{} hops", url, min_hops, max_hops);
+        
+        // Parse the URL to extract target information
         let parsed_url = url::Url::parse(&url)
             .map_err(|e| SdkError::InvalidUrl(format!("Invalid URL: {}", e)))?;
         
-        let host = parsed_url.host_str()
-            .ok_or_else(|| SdkError::InvalidUrl("Missing host in URL".to_string()))?;
-        
-        let port = parsed_url.port().unwrap_or(8443); // Default port for zks
-        let addr = format!("{}:{}", host, port);
-        
-        info!("Connecting to ZKS peer at {} with {}-{} hops", addr, min_hops, max_hops);
-        
-        // Create swarm for circuit building
-        let swarm = Swarm::new("zks-network".to_string());
-        
-        // For now, we'll implement a simplified version that connects directly
-        // In a full implementation, this would:
-        // 1. Start the swarm and discover peers
-        // 2. Build onion route with random hop count between min_hops and max_hops
-        // 3. Establish encrypted tunnel through each hop
-        // 4. Connect to final destination through the onion route
-        
-        // Placeholder: Direct connection for now
-        let stream = tokio::net::TcpStream::connect(&addr).await
-            .map_err(|e| SdkError::ConnectionFailed(format!("TCP connection failed: {}", e)))?;
-        
-        let peer_addr = stream.peer_addr()
-            .map_err(|e| SdkError::ConnectionFailed(format!("Failed to get peer address: {}", e)))?
+        let target_peer = parsed_url.host_str()
+            .ok_or_else(|| SdkError::InvalidUrl("Missing host in URL".to_string()))?
             .to_string();
         
-        debug!("TCP connection established to {}", peer_addr);
+        // Create swarm controller with platform detection
+        let swarm_controller = SwarmController::new().await
+            .map_err(|e| SdkError::ConnectionFailed(format!("Failed to create swarm controller: {}", e)))?;
+        
+        // Connect to signaling server (use default for now)
+        let signaling_url = "wss://signal.zks-protocol.org:8443";
+        let local_peer_id = format!("zks-client-{}", uuid::Uuid::new_v4());
+        
+        swarm_controller.connect(signaling_url, local_peer_id).await
+            .map_err(|e| SdkError::ConnectionFailed(format!("Failed to connect to signaling server: {}", e)))?;
+        
+        // Join default room for peer discovery
+        let room_id = "zks-onion-network";
+        let capabilities = zks_wire::PeerCapabilities {
+            supports_onion_routing: true,
+            max_hops: max_hops as u32,
+            ..Default::default()
+        };
+        
+        swarm_controller.join_room(room_id, capabilities).await
+            .map_err(|e| SdkError::ConnectionFailed(format!("Failed to join room: {}", e)))?;
+        
+        // Build onion circuit to target peer
+        info!("Building onion circuit to {} with {}-{} hops", target_peer, min_hops, max_hops);
+        let circuit_id = swarm_controller.build_onion_circuit(&target_peer, min_hops, max_hops).await
+            .map_err(|e| SdkError::ConnectionFailed(format!("Failed to build onion circuit: {}", e)))?;
+        
+        info!("🧅 Onion circuit {} established with {} hops", circuit_id, max_hops);
+        
+        // Create an onion stream that routes through the circuit
+        let onion_stream = swarm_controller.create_onion_stream(&circuit_id).await
+            .map_err(|e| SdkError::ConnectionFailed(format!("Failed to create onion stream: {}", e)))?;
+        
+        let peer_addr = format!("onion://{}/{}", target_peer, circuit_id);
+        
+        debug!("Onion stream established through circuit {}", circuit_id);
         
         // Box the stream for trait object compatibility
-        let boxed_stream: Box<dyn ZksStream> = Box::new(stream);
+        let boxed_stream: Box<dyn ZksStream> = Box::new(onion_stream);
         
         // Perform post-quantum handshake - assume we're the initiator for now
         let encrypted_stream = EncryptedStream::handshake(
@@ -73,19 +90,20 @@ impl ZksConnection {
             &config,
             true, // Swarm mode
             zks_proto::HandshakeRole::Initiator,
-            "zks-onion".to_string(), // Default room ID for onion connections
+            room_id.to_string(),
             None, // No trusted responder key for now
         ).await?;
         
-        info!("🔐 ZKS connection established with {} ({} hops)", peer_addr, min_hops);
+        info!("🔐 ZKS connection established with {} via onion circuit {} ({} hops)", peer_addr, circuit_id, max_hops);
         
         Ok(Self {
             stream: encrypted_stream,
             config,
             peer_addr,
-            hop_count: min_hops,
-            circuit: None, // Will be populated when we build the circuit
-            swarm: Some(swarm),
+            hop_count: max_hops,
+            circuit: None, // Will be populated when we implement full onion routing
+            swarm_controller: Some(swarm_controller),
+            circuit_id: Some(circuit_id),
         })
     }
     
@@ -185,19 +203,20 @@ impl ZksConnection {
     
     /// Build a circuit through the swarm for onion routing
     pub async fn build_circuit(&mut self, min_hops: u8, max_hops: u8) -> Result<()> {
-        if let Some(swarm) = &self.swarm {
-            info!("Building circuit with {}-{} hops", min_hops, max_hops);
+        if let Some(swarm_controller) = &self.swarm_controller {
+            info!("Building circuit with {}-{} hops via swarm controller", min_hops, max_hops);
             
-            let circuit = swarm.build_circuit(min_hops, max_hops).await
+            let target_peer = self.peer_addr.clone();
+            let circuit_id = swarm_controller.build_onion_circuit(&target_peer, min_hops, max_hops).await
                 .map_err(|e| SdkError::ConnectionFailed(format!("Failed to build circuit: {}", e)))?;
             
-            self.hop_count = circuit.hop_count() as u8;
-            self.circuit = Some(circuit);
+            self.hop_count = max_hops;
+            self.circuit_id = Some(circuit_id);
             
             info!("Successfully built circuit with {} hops", self.hop_count);
             Ok(())
         } else {
-            Err(SdkError::ConnectionFailed("No swarm available for circuit building".to_string()))
+            Err(SdkError::ConnectionFailed("No swarm controller available for circuit building".to_string()))
         }
     }
     
@@ -267,9 +286,14 @@ impl ZksConnection {
         self.circuit.as_ref()
     }
     
-    /// Get the swarm (if any)
-    pub fn swarm(&self) -> Option<&Swarm> {
-        self.swarm.as_ref()
+    /// Get the swarm controller (if any)
+    pub fn swarm_controller(&self) -> Option<&SwarmController> {
+        self.swarm_controller.as_ref()
+    }
+    
+    /// Get the circuit ID (if any)
+    pub fn circuit_id(&self) -> Option<&str> {
+        self.circuit_id.as_deref()
     }
     
     /// Gracefully close the connection

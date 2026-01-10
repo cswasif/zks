@@ -1,0 +1,8 @@
+[bindings.kotlin]
+package_name = "com.zks.uniffi"
+
+[bindings.swift]
+module_name = "ZksUniffi"
+
+[bindings.python]
+module_name = "zks_uniffi"

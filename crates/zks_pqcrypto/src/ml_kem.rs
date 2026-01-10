@@ -56,15 +56,11 @@ impl RngCore for OsRngCompat {
     }
     
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        // Use try_fill_bytes to avoid panicking on RNG failure
-        if let Err(e) = self.try_fill_bytes(dest) {
-            // Fallback: use a simple counter-based approach if getrandom fails
-            // This is not cryptographically secure but prevents panics
-            tracing::warn!("getrandom failed, using fallback RNG: {}", e);
-            for (i, byte) in dest.iter_mut().enumerate() {
-                *byte = (i as u8).wrapping_mul(7).wrapping_add(0x42);
-            }
-        }
+        // SECURITY CRITICAL: RNG MUST succeed or panic
+        // Never use predictable fallback values for cryptographic operations
+        // If getrandom fails, key generation cannot be secure
+        self.try_fill_bytes(dest)
+            .expect("CRITICAL: Cryptographic RNG unavailable - cannot generate secure keys. This indicates a system-level issue with entropy sources.");
     }
     
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> std::result::Result<(), rand_core::Error> {

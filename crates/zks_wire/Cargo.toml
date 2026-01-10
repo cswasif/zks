@@ -46,5 +46,13 @@ hex = "0.4"
 zks_crypt = { version = "0.1.0", path = "../zks_crypt" }
 zeroize = "1.6"
 
+# WebSocket support (Android compatible)
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-native-roots"] }
+futures-util = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+
+# P2P networking
+libp2p = { version = "0.53", features = ["tcp", "tokio", "noise", "yamux", "ping", "relay", "dcutr", "macros", "tls"] }
+
 [dev-dependencies]
 tokio-test = "0.4"

@@ -1,0 +1,28 @@
+namespace zks_uniffi {};
+
+[Error]
+enum ZksError {
+    "NotConnected",
+    "ConnectionFailed",
+    "MatchFailed",
+    "AsyncError",
+};
+
+dictionary PeerInfo {
+    string peer_id;
+    sequence<u8> public_key;
+    string? endpoint_hint;
+};
+
+enum ConnectionState {
+    "Disconnected",
+    "Matching",
+    "Connected",
+};
+
+interface ZksMeetClient {
+    constructor(string peer_id);
+    [Name=new_random]
+    constructor();
+    string get_peer_id();
+};

@@ -3,6 +3,18 @@ use wasm_bindgen::prelude::*;
 // Re-export essential ZKS types
 pub use zks_pqcrypto::ml_dsa::{MlDsa, MlDsaKeypair};
 
+// WebSocket transport modules
+pub mod transport;
+pub mod onion_transport;
+pub mod bindings;
+
+// Re-export transport types
+pub use transport::{WebSocketTransport, TransportConfig, TransportState};
+pub use onion_transport::{BrowserOnionTransport, BrowserTransportConfig, OnionCircuit, OnionMessage};
+
+// Re-export JavaScript bindings
+pub use bindings::{ZksOnionTransport, ZksConnectionManager};
+
 /// Utility functions for encryption/decryption and post-quantum crypto
 #[wasm_bindgen]
 pub struct ZksWasmUtils;

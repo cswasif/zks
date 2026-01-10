@@ -320,6 +320,9 @@ impl Handshake {
             return Err(ProtoError::handshake("Room ID mismatch"));
         }
         
+        // SECURITY: Validate timestamp for replay protection (symmetric with response validation)
+        self.validate_timestamp(init.timestamp)?;
+        
         // Store remote ephemeral key and nonce
         self.remote_ephemeral_public_key = Some(init.ephemeral_key.clone());
         self.remote_nonce = Some(init.nonce);

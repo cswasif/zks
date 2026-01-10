@@ -293,13 +293,17 @@ impl RelayServer {
         Ok(())
     }
     
-    /// Generate a relay address for a client
-    fn generate_relay_address(&self, client_addr: SocketAddr) -> Result<SocketAddr> {
-        // For simplicity, use the same IP but different port
-        // In a real implementation, this would allocate from a pool of relay addresses
+    /// Generate a relay address for a client using cryptographically secure random port
+    fn generate_relay_address(&self, _client_addr: SocketAddr) -> Result<SocketAddr> {
+        // SECURITY: Use cryptographic random for port selection to prevent prediction attacks
+        let mut port_bytes = [0u8; 2];
+        getrandom::getrandom(&mut port_bytes)
+            .map_err(|e| WireError::other(&format!("RNG failure in relay port generation: {}", e)))?;
+        
         let base_port = self.config.bind_addr.port();
-        let client_port = client_addr.port();
-        let relay_port = base_port + (client_port % 1000) + 1;
+        // Generate random offset within safe range (1-1000) to avoid port conflicts
+        let random_offset = (u16::from_le_bytes(port_bytes) % 1000) + 1;
+        let relay_port = base_port.saturating_add(random_offset);
         
         Ok(SocketAddr::new(self.config.bind_addr.ip(), relay_port))
     }

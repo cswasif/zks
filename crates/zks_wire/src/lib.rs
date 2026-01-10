@@ -40,6 +40,9 @@ pub mod stun;
 pub mod swarm;
 pub mod circuit;
 pub mod wire;
+pub mod signaling;
+pub mod p2p;
+pub mod swarm_controller;
 
 pub use error::{WireError, Result};
 pub use nat::{NatTraversal, NatType};
@@ -48,6 +51,9 @@ pub use stun::{StunClient, StunServer, IceCandidate};
 pub use swarm::{Swarm, Peer, PeerId, SwarmEvent};
 pub use circuit::{SwarmCircuit, CircuitBuilder};
 pub use wire::{WireMessage, WireProtocol, MessageType};
+pub use signaling::{SignalingClient, SignalingMessage, PeerInfo, PeerCapabilities};
+pub use p2p::{NativeP2PTransport, NativeP2PError};
+pub use swarm_controller::{SwarmController, SwarmControllerError, Platform, TransportCapabilities, OnionStream};
 
 /// Re-export commonly used types
 pub mod prelude {

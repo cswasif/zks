@@ -34,15 +34,19 @@ impl SwarmCircuit {
             middle_peers: Vec::new(),
             exit_peer: PeerId::new(),
             layer_keys: Vec::new(),
-            circuit_id: Self::generate_circuit_id(),
+            circuit_id: Self::generate_circuit_id().unwrap_or_else(|_| {
+                // Last resort: use a deterministic ID if RNG fails (should never happen)
+                [0u8; 16]
+            }),
         }
     }
     
     /// Generate a unique circuit ID using cryptographically secure random
-    fn generate_circuit_id() -> [u8; 16] {
+    fn generate_circuit_id() -> Result<[u8; 16]> {
         let mut id = [0u8; 16];
-        getrandom::getrandom(&mut id).expect("Failed to generate random circuit ID");
-        id
+        getrandom::getrandom(&mut id)
+            .map_err(|e| WireError::other(&format!("CRITICAL: Failed to generate random circuit ID - RNG unavailable: {}", e)))?;
+        Ok(id)
     }
 
     /// Get a copy of a layer key (for encryption/decryption operations)
@@ -214,9 +218,11 @@ impl CircuitBuilder {
         }
         
         // Shuffle candidates for randomness
+        // SECURITY: Use cryptographically secure RNG for circuit path selection
+        // thread_rng() is NOT cryptographically secure - OsRng provides true randomness
         use rand::seq::SliceRandom;
-        let mut rng = rand::thread_rng();
-        candidates.shuffle(&mut rng);
+        use rand::rngs::OsRng;
+        candidates.shuffle(&mut OsRng);
         
         // Select peers for the circuit
         let mut circuit = SwarmCircuit::new();

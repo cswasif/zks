@@ -7,7 +7,7 @@
 //! - Security level definitions
 
 use std::fmt;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroize;
 
 /// Security buffer for encrypted data
 /// 

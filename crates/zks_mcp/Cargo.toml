@@ -1,0 +1,52 @@
+[package]
+name = "zks_mcp"
+version = "0.1.0"
+edition = "2021"
+description = "MCP Server for ZKS Protocol - AI-powered post-quantum development"
+license = "AGPL-3.0"
+
+[dependencies]
+# MCP SDK
+rmcp = { version = "0.8", features = ["server", "macros", "transport-io", "transport-streamable-http-server"] }
+
+# ZKS Protocol crates
+zks_sdk = { path = "../zks_sdk", package = "zks" }
+zks_crypt = { path = "../zks_crypt" }
+zks_pqcrypto = { path = "../zks_pqcrypto" }
+zks_proto = { path = "../zks_proto" }
+zks_wire = { path = "../zks_wire" }
+zks_types = { path = "../zks_types" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1.1"
+
+# Utilities
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+base64 = "0.22"
+hex = "0.4"
+url = "2.5"
+uuid = { version = "1.0", features = ["v4"] }
+regex = "1.0"
+toml = "0.8"
+
+# Cryptography
+sha2 = "0.10"
+sha3 = "0.10"
+hmac = "0.12"
+
+[features]
+default = ["stdio"]
+stdio = []
+http = []
+full = ["stdio", "http"]
+
+[[bin]]
+name = "zks-mcp-server"
+path = "src/bin/zks-mcp-server.rs"

@@ -61,7 +61,11 @@ impl CiphertextScrambler {
     }
     
     /// Generate a permutation using deterministic Fisher-Yates shuffle
+    /// Uses ChaCha20Rng seeded by entropy for cryptographically secure, unbiased permutation
     fn generate_permutation(entropy: &[u8; 32], size: usize) -> Vec<u16> {
+        use rand::{Rng, SeedableRng};
+        use rand_chacha::ChaCha20Rng;
+        
         // Initialize identity permutation
         let mut perm: Vec<u16> = (0..size as u16).collect();
         
@@ -69,52 +73,15 @@ impl CiphertextScrambler {
             return perm;
         }
         
-        // Use entropy to seed a deterministic PRNG
-        // We'll use SHA256 chaining for random numbers
-        let mut state = *entropy;
-        let mut random_idx = 0usize;
-        let mut random_bytes = [0u8; 32];
+        // SECURITY: Use ChaCha20Rng seeded by entropy for deterministic but unbiased randomness
+        // ChaCha20 is cryptographically secure and gen_range uses rejection sampling
+        // This eliminates modulo bias that could theoretically leak permutation information
+        let mut rng = ChaCha20Rng::from_seed(*entropy);
         
-        // Fisher-Yates shuffle with rejection sampling to eliminate modulo bias
+        // Fisher-Yates shuffle with rejection sampling via gen_range (no modulo bias)
         for i in (1..size).rev() {
-            // Generate unbiased random index in range [0, i]
-            // Use modular reduction with sufficient randomness to avoid bias
-            let j = if i <= 255 {
-                // For small ranges, use single byte with simple modular reduction
-                if random_idx >= 32 {
-                    let mut hasher = Sha256::new();
-                    hasher.update(&state);
-                    hasher.update(&(i as u64).to_le_bytes());
-                    let result = hasher.finalize();
-                    random_bytes.copy_from_slice(&result);
-                    state = random_bytes;
-                    random_idx = 0;
-                }
-                
-                let r = random_bytes[random_idx];
-                random_idx += 1;
-                (r as usize) % (i + 1)
-            } else {
-                // For larger ranges, use multiple bytes with better distribution
-                if random_idx >= 28 { // Need at least 4 bytes
-                    let mut hasher = Sha256::new();
-                    hasher.update(&state);
-                    hasher.update(&(i as u64).to_le_bytes());
-                    let result = hasher.finalize();
-                    random_bytes.copy_from_slice(&result);
-                    random_idx = 0;
-                }
-                
-                // Use 32-bit value for better distribution
-                let r = ((random_bytes[random_idx] as u32) << 24)
-                    | ((random_bytes[random_idx + 1] as u32) << 16)
-                    | ((random_bytes[random_idx + 2] as u32) << 8)
-                    | (random_bytes[random_idx + 3] as u32);
-                random_idx += 4;
-                (r as usize) % (i + 1)
-            };
-            
-            // Swap
+            // gen_range uses rejection sampling internally for uniform distribution
+            let j = rng.gen_range(0..=i);
             perm.swap(i, j);
         }
         
